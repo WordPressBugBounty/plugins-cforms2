@@ -1,9 +1,8 @@
 === cformsII ===
 Contributors: bgermann, cbacchini, codifex, nb000, wdfee, passoniate
 Donate link: https://www.betterplace.org/projects/11633/donations/new
-Tags: contact form, contact, form, post, sidebar, multi step, api exposed, fork
-Requires at least: 5.2
-Tested up to: 6.5
+Tags: form, contact, sidebar, multi step, fork
+Tested up to: 6.8
 Stable tag: trunk
 License: GPLv3 or later
 License URI: http://www.gnu.org/licenses/gpl-3.0
@@ -108,11 +107,15 @@ cformsII can be extended via WordPress actions and filters. You find their 'cfor
 
 == Upgrade Notice ==
 
-= 15.0.7 =
+= 15.0.8 =
 The tracking database feature and its view are removed with cformsII 15.0+. Your data still exists in the database. Please have a look at CFDB plugin as a replacement.
 
 
 == Changelog ==
+
+= 15.0.8 =
+
+* bugfix:   remove unnecessary span elements from HTML attribute values
 
 = 15.0.7 =
 
