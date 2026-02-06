@@ -2,7 +2,7 @@
 Contributors: bgermann, cbacchini, codifex, nb000, wdfee, passoniate
 Donate link: https://www.betterplace.org/projects/11633/donations/new
 Tags: form, contact, sidebar, multi step, fork
-Tested up to: 6.8
+Tested up to: 6.9
 Stable tag: trunk
 License: GPLv3 or later
 License URI: http://www.gnu.org/licenses/gpl-3.0
@@ -10,8 +10,6 @@ License URI: http://www.gnu.org/licenses/gpl-3.0
 == Description ==
 
 This is a fork of cformsII, a highly customizable, flexible and powerful form builder plugin, covering a variety of use cases and features.
-
-Oliver, the original author, discontinued developing the plugin. This fork is an effort to keep it up to date.
 
 If you want to use plugin versions older than 14.6.3, you should rename the directory containing the plugin from "cforms2" to "cforms". But bear in mind that old versions should not be used in public systems, because they contain [known serious vulnerabilities](https://wpvulndb.com/plugins/cforms) that are exploited in the wild.
 
@@ -36,17 +34,6 @@ You can see the available languages and contribute via [GlotPress](https://trans
 If you want to install another language, please choose its cell in the Development column, export it as Machine Object Message Catalog (.mo) and put it in the wp-content/languages/plugins directory.
 
 
-== Roadmap ==
-
-Some things are to be done:
-
-* add a Gutenberg equivalent of the editor plugin
-* filter user input better
-* rework multi-part forms to be independent from PHP sessions
-* refactoring with object oriented approach
-* long term: unit tests and continuous integration
-
-
 == Installation ==
 
 = Installing the plugin =
@@ -54,8 +41,6 @@ Some things are to be done:
 You can install the plugin via WordPress Dashboard. It should show up by searching for cforms2. If this does not work for you, there should be an option to upload a zip file, which is available on the [wordpress.org plugin directory](https://wordpress.org/plugins/cforms2/).
 
 If you want to install manually, please upload the complete plugin folder "cforms2", contained in the zip file, to your WordPress plugin directory!
-
-If you want to check integrity of the download, please use the cforms2.*.sig GPG signature files that are published via [GitHub releases](https://github.com/bgermann/cforms2/releases). The [key used for signing](https://keys.openpgp.org/vks/v1/by-fingerprint/D9426F9637DCA799FF0F9AF22626D16964438E53) has the fingerprint `D942 6F96 37DC A799 FF0F  9AF2 2626 D169 6443 8E53`. The git tags themselves are also signed beginning with version 14.8.
 
 = Upgrading the plugin =
 
@@ -82,15 +67,9 @@ Most probably this is not cformsII's fault. Please check your WordPress mail con
 
 That function was removed. The WordPress function [wp_mail](https://codex.wordpress.org/Function_Reference/wp_mail) is used for mails now, which makes use of built-in PHPMailer by default. If you want to configure it to use an external SMTP server, use an appropriate plugin, e.g. [WP Mail SMTP](https://wordpress.org/plugins/wp-mail-smtp/).
 
-If wp_mail is replaced by some plugin, multipart/alternative emails may not be sent properly, which is the case with e.g. Postman SMTP Mailer/Email Log.
-
 = Why is the Form Settings page broken? =
 
 This is an incompatibility with WordPress 4.2+ that was fixed with cformsII 14.9.3. Be sure to use a current version.
-
-= How can I contribute code? =
-
-Please use [GitHub pull requests](https://github.com/bgermann/cforms2/pulls).
 
 = Where are comment and Tell-a-Friend fields? =
 
@@ -107,11 +86,32 @@ cformsII can be extended via WordPress actions and filters. You find their 'cfor
 
 == Upgrade Notice ==
 
-= 15.0.8 =
+= 15.1.2 =
 The tracking database feature and its view are removed with cformsII 15.0+. Your data still exists in the database. Please have a look at CFDB plugin as a replacement.
 
 
 == Changelog ==
+
+= 15.1.2 =
+
+* bugfix:   Construct multipart/alternative emails
+
+= 15.1.1 =
+
+* bugfix:   Use wp_timezone_string over get_option once again
+
+= 15.1 =
+
+* bugfix:   get rid of wp_mail workaround
+
+= 15.0.10 =
+
+* bugfix:   Use wp_timezone_string over get_option
+
+= 15.0.9 =
+
+* enhanced: register Fieldtypes on init (PHP 8.4 warnings)
+* bugfix:   fix start date and end date
 
 = 15.0.8 =
 
