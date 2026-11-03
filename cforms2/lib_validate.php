@@ -52,6 +52,20 @@ function cforms2_move_files($no, $inSession, &$file) {
 
 }
 
+/** remove uploaded file copies once they are no longer needed */
+function cforms2_delete_files($fdata) {
+    $tmpdir = get_temp_dir();
+    foreach ((array) $fdata as $f) {
+        $file = isset($f['name']) ? $f['name'] : '';
+        // Only remove files we placed in the temporary directory; never
+        // unlink arbitrary paths.
+        if (!is_string($file) || $file === '' || strpos($file, $tmpdir) !== 0)
+            continue;
+        wp_delete_file($file);
+    }
+
+}
+
 function cforms2_is_email($string) {
     return preg_match("/^[_a-z0-9+-]+(\.[_a-z0-9+-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,63})$/i", $string);
 
@@ -59,6 +73,21 @@ function cforms2_is_email($string) {
 
 function cforms2_validate($no, $isMPform = false, $custom = false, $customfields = array(), $custom_error = '') {
     $cformsSettings = get_option('cforms_settings');
+
+    // CSRF protection for direct (non-AJAX) submissions. AJAX submissions go
+    // through cforms2_submitcform(), which verifies the same nonce before
+    // this function is called, so this check is safe for both paths.
+    $nonce = isset($_POST['_wpnonce']) && is_string($_POST['_wpnonce']) ? $_POST['_wpnonce'] : '';
+    if (isset($_POST['sendbutton' . $no]) && !wp_verify_nonce($nonce, 'submitcform')) {
+        return array(
+            'text' => '<span>' . __('Your session has expired. Please reload the page and try again.', 'cforms2') . '</span>',
+            'class' => ' failure',
+            'all_valid' => false,
+            'track' => array(),
+            'limit_reached' => false,
+            'validations' => array()
+        );
+    }
 
     $validations = array();
     $all_valid = true;
@@ -639,7 +668,7 @@ function cforms2_validate($no, $isMPform = false, $custom = false, $customfields
         $htmlmessage = '';
         if (substr($cformsSettings['form' . $no]['cforms' . $no . '_formdata'], 2, 1) == '1') {
             $htmlmessage = stripslashes($cformsSettings['form' . $no]['cforms' . $no . '_header_html']);
-            $htmlmessage = cforms2_check_default_vars($htmlmessage, $no);
+            $htmlmessage = cforms2_check_default_vars($htmlmessage, $no, true);
             $htmlmessage = cforms2_check_cust_vars($htmlmessage, $track, true);
         }
 
@@ -654,8 +683,8 @@ function cforms2_validate($no, $isMPform = false, $custom = false, $customfields
         } else
             $mail->body = $message . ($mail->f_txt ? "\n$formdata" : '');
 
-        $usermessage_text = cforms2_check_default_vars($usermessage_text, $no);
-        $usermessage_text = cforms2_check_cust_vars($usermessage_text, $track);
+        $usermessage_text = cforms2_check_default_vars($usermessage_text, $no, true);
+        $usermessage_text = cforms2_check_cust_vars($usermessage_text, $track, true);
         $usermessage_text = apply_filters('cforms2_usermessage_filter', $usermessage_text, $no, $pid);
 
 
@@ -732,7 +761,7 @@ function cforms2_validate($no, $isMPform = false, $custom = false, $customfields
                 $cmsghtml = '';
                 if (substr($cformsSettings['form' . $no]['cforms' . $no . '_formdata'], 3, 1) == '1') {
                     $cmsghtml = stripslashes($cformsSettings['form' . $no]['cforms' . $no . '_cmsg_html']);
-                    $cmsghtml = cforms2_check_default_vars($cmsghtml, $no);
+                    $cmsghtml = cforms2_check_default_vars($cmsghtml, $no, true);
                     $cmsghtml = cforms2_check_cust_vars($cmsghtml, $track, true);
                 }
 
@@ -781,6 +810,11 @@ function cforms2_validate($no, $isMPform = false, $custom = false, $customfields
                 }
             }
         }
+
+        // The uploaded files have been sent as attachments; remove the
+        // temporary copies so they do not accumulate in the temp directory.
+        cforms2_delete_files($fdata);
+        unset($_SESSION['cforms']['upload']);
     }
 
     return array(

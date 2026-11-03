@@ -189,7 +189,7 @@ function cforms2_check_post_vars($fv) {
 }
 
 /** look for default/system variables */
-function cforms2_check_default_vars($m, $no) {
+function cforms2_check_default_vars($m, $no, $html = false) {
 
     $pid = cforms2_get_the_id($no);
 
@@ -215,24 +215,36 @@ function cforms2_check_default_vars($m, $no) {
 
     $current_user = wp_get_current_user();
 
-    $m = str_replace('{PostID}', $pid, $m);
-    $m = str_replace('{Form Name}', Cforms2\FormSettings::form($no)->name(), $m);
-    $m = str_replace('{Page}', $page, $m);
-    $m = str_replace('{Date}', $date, $m);
-    $m = str_replace('{Author}', $user_name, $m);
-    $m = str_replace('{Time}', $time, $m);
-    $m = str_replace('{IP}', cforms2_get_ip(), $m);
-    $m = str_replace('{BLOGNAME}', get_option('blogname'), $m);
+    $vars = array(
+        '{PostID}' => $pid,
+        '{Form Name}' => Cforms2\FormSettings::form($no)->name(),
+        // {Page} is already HTML-escaped by cforms2_get_current_page().
+        '{Page}' => $page,
+        '{Date}' => $date,
+        '{Author}' => $user_name,
+        '{Time}' => $time,
+        '{IP}' => cforms2_get_ip(),
+        '{BLOGNAME}' => get_option('blogname'),
+        '{CurUserID}' => $current_user->ID,
+        '{CurUserName}' => $current_user->display_name,
+        '{CurUserEmail}' => $current_user->user_email,
+        '{CurUserFirstName}' => $current_user->user_firstname,
+        '{CurUserLastName}' => $current_user->user_lastname,
+        '{Permalink}' => $permalink,
+        '{Title}' => $post_title,
+        '{Excerpt}' => $post_excerpt,
+    );
 
-    $m = str_replace('{CurUserID}', $current_user->ID, $m);
-    $m = str_replace('{CurUserName}', $current_user->display_name, $m);
-    $m = str_replace('{CurUserEmail}', $current_user->user_email, $m);
-    $m = str_replace('{CurUserFirstName}', $current_user->user_firstname, $m);
-    $m = str_replace('{CurUserLastName}', $current_user->user_lastname, $m);
+    if ($html) {
+        // Encode everything except {Page}, which is already escaped, so that
+        // these values cannot inject markup into messages or HTML emails.
+        foreach ($vars as $key => $value) {
+            if ($key !== '{Page}')
+                $vars[$key] = esc_html($value);
+        }
+    }
 
-    $m = str_replace('{Permalink}', $permalink, $m);
-    $m = str_replace('{Title}', $post_title, $m);
-    $m = str_replace('{Excerpt}', $post_excerpt, $m);
+    $m = str_replace(array_keys($vars), array_values($vars), $m);
 
     $m = preg_replace("/\r\n\./", "\n", $m);
 
@@ -269,9 +281,15 @@ function cforms2_check_cust_vars($m, $track, $html = false) {
 
                 $v = stripslashes($track[$fTrackedVar]);
 
-                // CRs for textareas \r\n user input hardcoded!
-                if ($html && strpos($v, "\n") !== false)
-                    $v = str_replace("\n", '<br />' . "\r\n", $v);
+                if ($html) {
+                    // The tracked value is user input; encode it before it is
+                    // placed into an HTML context (messages and HTML emails).
+                    $v = esc_html($v);
+
+                    // CRs for textareas \r\n user input hardcoded!
+                    if (strpos($v, "\n") !== false)
+                        $v = str_replace("\n", '<br />' . "\r\n", $v);
+                }
 
                 $m = str_replace('{' . $fvar . '}', $v, $m);
             }
@@ -281,24 +299,24 @@ function cforms2_check_cust_vars($m, $track, $html = false) {
 
 }
 
+/**
+ * Returns the visitor's IP address as reported by the web server.
+ *
+ * Forwarding headers (X-Forwarded-For, Client-IP, ...) are sent by the client
+ * and can be spoofed, so they are deliberately ignored here. Sites behind a
+ * reverse proxy that need the original client address should have the proxy
+ * set REMOTE_ADDR (or configure PHP-FPM/real_ip accordingly).
+ */
 function cforms2_get_ip() {
-    if (isset($_SERVER)) {
-        if (isset($_SERVER["HTTP_X_FORWARDED_FOR"]))
-            $ip_addr = $_SERVER["HTTP_X_FORWARDED_FOR"];
-        elseif (isset($_SERVER["HTTP_CLIENT_IP"]))
-            $ip_addr = $_SERVER["HTTP_CLIENT_IP"];
-        else
-            $ip_addr = $_SERVER["REMOTE_ADDR"];
-    } else {
-        if (getenv('HTTP_X_FORWARDED_FOR'))
-            $ip_addr = getenv('HTTP_X_FORWARDED_FOR');
-        elseif (getenv('HTTP_CLIENT_IP'))
-            $ip_addr = getenv('HTTP_CLIENT_IP');
-        else
-            $ip_addr = getenv('REMOTE_ADDR');
-    }
-    $ip_addr = filter_var($ip_addr, FILTER_VALIDATE_IP, FILTER_FLAG_NO_RES_RANGE);
-    return $ip_addr ? $ip_addr : '';
+    if (empty($_SERVER['REMOTE_ADDR']))
+        return '';
+
+    $ip_addr = rest_is_ip_address($_SERVER['REMOTE_ADDR']);
+    if ($ip_addr === false)
+        return '';
+
+    // Still reject reserved ranges, as the plugin did before.
+    return filter_var($ip_addr, FILTER_VALIDATE_IP, FILTER_FLAG_NO_RES_RANGE) ? $ip_addr : '';
 
 }
 

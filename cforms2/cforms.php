@@ -20,13 +20,13 @@
  * Plugin URI: https://wordpress.org/plugins/cforms2/
  * Description: cformsII is a customizable, flexible and powerful form plugin including simple spam protection, multi-step forms, role manager support and custom themes.
  * Author: Oliver Seidel, Bastian Germann
- * Version: 15.1.4
- * Requires at least: 6.9
+ * Version: 15.2
+ * Requires at least: 7.0
  * Text Domain: cforms2
  */
 namespace Cforms2;
 
-define('CFORMS2_VERSION', '15.1.4');
+define('CFORMS2_VERSION', '15.2');
 
 // Debug message handling.
 if (!defined('WP_DEBUG_CFORMS2')) {
@@ -55,6 +55,7 @@ require_once plugin_dir_path(__FILE__) . 'Fieldtypes/captcha.php';
 require_once plugin_dir_path(__FILE__) . 'lib_activate.php';
 require_once plugin_dir_path(__FILE__) . 'lib_ajax.php';
 require_once plugin_dir_path(__FILE__) . 'lib_aux.php';
+require_once plugin_dir_path(__FILE__) . 'lib_editor.php';
 require_once plugin_dir_path(__FILE__) . 'lib_functions.php';
 require_once plugin_dir_path(__FILE__) . 'lib_render.php';
 require_once plugin_dir_path(__FILE__) . 'lib_validate.php';
@@ -74,10 +75,6 @@ if (!is_array(get_option('cforms_settings'))) {
 }
 
 if (is_admin()) {
-    require_once plugin_dir_path(__FILE__) . 'lib_editor.php';
-
-    cforms2_register_editor();
-
     if (array_key_exists('QUERY_STRING', $_SERVER) && strpos($_SERVER['QUERY_STRING'], 'cforms') !== false) {
         add_action('admin_enqueue_scripts', 'cforms2_admin_enqueue_scripts');
     }
@@ -98,6 +95,8 @@ if (is_admin()) {
 
 // Attaching to hooks.
 add_action('template_redirect', 'cforms2_start_session');
+// Run after the session is started (priority 10) so validation can use it.
+add_action('template_redirect', 'cforms2_maybe_redirect', 20);
 add_action('wp_ajax_submitcform', 'cforms2_submitcform');
 add_action('wp_ajax_nopriv_submitcform', 'cforms2_submitcform');
 add_action('plugins_loaded', function() {

@@ -87,11 +87,14 @@ function cforms2($no = '', $customfields = array()) {
     // TODO integrate this check better
     $server_upload_size_error = false;
     $displayMaxSize = ini_get('post_max_size');
+    // Do not run this check on REST API requests. Gutenberg's JSON saves are
+    // also POST requests with an empty $_POST, which would falsely trigger the
+    // check and corrupt the response with stray output.
     if ($_SERVER['REQUEST_METHOD'] == 'POST' && empty($_POST) &&
-            empty($_FILES) && $_SERVER['CONTENT_LENGTH'] > 0) {
+            empty($_FILES) && $_SERVER['CONTENT_LENGTH'] > 0 && !defined('REST_REQUEST')) {
         $server_upload_size_error = true;
         $msgSize = $_SERVER['CONTENT_LENGTH'] / 1048576;
-        echo ("<pre>Maximum size allowed:" . $displayMaxSize . "; size of your message:" . number_format((float) $msgSize, 2, '.', '') . "M</pre>");
+        $content .= "<pre>Maximum size allowed:" . $displayMaxSize . "; size of your message:" . number_format((float) $msgSize, 2, '.', '') . "M</pre>";
     }
 
     // non-AJAX method
@@ -103,14 +106,6 @@ function cforms2($no = '', $customfields = array()) {
         $usermessage_class = $validation_result['class'];
         $track = $validation_result['track'];
         $validations = $validation_result['validations'];
-
-        if ($all_valid && Cforms2\FormSettings::form($no)->getRedirect()) {
-            $cf_redirect = Cforms2\FormSettings::form($no)->getRedirectPage();
-            if (!empty($cf_redirect)) { // TODO rework to do this via HTTP?
-                echo '<script type="text/javascript">'
-                . 'location.href = "' . $cf_redirect . '"</script>';
-            }
-        }
     }
 
     // paint form
@@ -510,9 +505,9 @@ function cforms2($no = '', $customfields = array()) {
                     } else
                         $type = ($field_type == 'pwfield') ? 'password' : 'text';
 
-                    $onfocus = $field_clear ? ' onfocus="clearField(this)" onblur="setField(this)"' : '';
+                    $clear = $field_clear ? ' data-cf-clear="1"' : '';
 
-                    $field = '<input' . $h5 . $readonly . $disabled . ' type="' . $type . '" name="' . $input_name . '" id="' . $input_id . '" class="' . $field_class . '" value="' . $field_value . '"' . $onfocus . ' title="' . $fieldTitle . '"/>';
+                    $field = '<input' . $h5 . $readonly . $disabled . ' type="' . $type . '" name="' . $input_name . '" id="' . $input_id . '" class="' . $field_class . '" value="' . $field_value . '"' . $clear . ' title="' . $fieldTitle . '"/>';
                     if (!empty($reg_exp))
                         $field .= '<input type="hidden" name="' . $input_name . '_regexp" id="' . $input_id . '_regexp" value="' . $reg_exp . '" title="' . $fieldTitle . '"/>';
 
@@ -531,9 +526,9 @@ function cforms2($no = '', $customfields = array()) {
                     break;
 
                 case "textarea":
-                    $onfocus = $field_clear ? ' onfocus="clearField(this)" onblur="setField(this)"' : '';
+                    $clear = $field_clear ? ' data-cf-clear="1"' : '';
 
-                    $field = '<textarea' . $readonly . $disabled . ' cols="30" rows="8" name="' . $input_name . '" id="' . $input_id . '" class="' . $field_class . '"' . $onfocus . ' title="' . $fieldTitle . '">' . $field_value . '</textarea>';
+                    $field = '<textarea' . $readonly . $disabled . ' cols="30" rows="8" name="' . $input_name . '" id="' . $input_id . '" class="' . $field_class . '"' . $clear . ' title="' . $fieldTitle . '">' . $field_value . '</textarea>';
                     if (!empty($reg_exp))
                         $field .= '<input type="hidden" name="' . $input_name . '_regexp" id="' . $input_id . '_regexp" value="' . $reg_exp . '" title="' . $fieldTitle . '"/>';
                     break;
@@ -766,6 +761,10 @@ function cforms2($no = '', $customfields = array()) {
     }
 
 
+    // CSRF token for direct (non-AJAX) submissions. AJAX submissions carry
+    // the same nonce, which cforms2_submitcform() verifies.
+    $formcontent .= '<input type="hidden" name="_wpnonce" id="cforms2_nonce' . $no . '" value="' . esc_attr(wp_create_nonce('submitcform')) . '"/>';
+
     $formcontent .= '<input type="hidden" name="cf_working' . $no . '" id="cf_working' . $no . '" value="' . stripslashes(htmlspecialchars($cformsSettings['form' . $no]['cforms' . $no . '_working'])) . '"/>' .
             '<input type="hidden" name="cf_failure' . $no . '" id="cf_failure' . $no . '" value="' . stripslashes(htmlspecialchars($cformsSettings['form' . $no]['cforms' . $no . '_failure'])) . '"/>' .
             '<input type="hidden" name="cf_customerr' . $no . '" id="cf_customerr' . $no . '" value="' . htmlspecialchars($custom_error) . '"/>';
@@ -779,7 +778,7 @@ function cforms2($no = '', $customfields = array()) {
     // multi-part form: reset
     $reset = '';
     if ($cformsSettings['form' . $no]['cforms' . $no . '_mp']['mp_form'] && $cformsSettings['form' . $no]['cforms' . $no . '_mp']['mp_reset'])
-        $reset = '<input tabindex="999" type="submit" name="resetbutton' . $no . '" id="resetbutton' . $no . '" class="resetbutton" value="' . $cformsSettings['form' . $no]['cforms' . $no . '_mp']['mp_resettext'] . '" onclick="return confirm(\'' . __('Note: This will reset all your input!', 'cforms2') . '\')">';
+        $reset = '<input tabindex="999" type="submit" name="resetbutton' . $no . '" id="resetbutton' . $no . '" class="resetbutton" value="' . $cformsSettings['form' . $no]['cforms' . $no . '_mp']['mp_resettext'] . '" data-cf-reset-confirm="' . esc_attr(__('Note: This will reset all your input!', 'cforms2')) . '">';
 
 
     // multi-part form: back
@@ -794,6 +793,71 @@ function cforms2($no = '', $customfields = array()) {
         $content .= '<div id="usermessage' . $no . 'b" class="cf_info ' . $usermessage_class . $umc . '" >' . $usermessage_text . '</div>';
 
     return $content;
+
+}
+
+/**
+ * Redirect the browser after a successful non-AJAX submission via an HTTP
+ * header.
+ *
+ * Non-AJAX ("cformsdirect") forms perform a full page POST. Handling the
+ * redirect here, on template_redirect before any output is sent, allows the
+ * redirect to be issued with an HTTP Location header instead of printing a
+ * location.href script into the page body.
+ */
+function cforms2_maybe_redirect() {
+
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        return;
+    }
+
+    // Find the submitted form. Form 1 posts a "sendbutton" field, all later
+    // forms post "sendbutton<n>".
+    $no = null;
+    foreach (array_keys($_POST) as $key) {
+        if (preg_match('/^sendbutton(\d*)$/', $key, $m)) {
+            $no = $m[1];
+            break;
+        }
+    }
+    if ($no === null) {
+        return;
+    }
+
+    $cformsSettings = get_option('cforms_settings');
+    if (!isset($cformsSettings['form' . $no]) || !Cforms2\FormSettings::form($no)->getRedirect()) {
+        return;
+    }
+
+    $cf_redirect = Cforms2\FormSettings::form($no)->getRedirectPage();
+    if (empty($cf_redirect)) {
+        return;
+    }
+
+    $isMPform = $cformsSettings['form' . $no]['cforms' . $no . '_mp']['mp_form'];
+    $validation_result = cforms2_validate($no, $isMPform, false, array(), '');
+
+    if (!$validation_result['all_valid']) {
+        return;
+    }
+
+    // Keep the multi-part form session state in sync, as the renderer would
+    // for a full page POST.
+    if ($isMPform && isset($_SESSION['cforms']) && $_SESSION['cforms']['current'] > 0
+            && $cformsSettings['form' . $no]['cforms' . $no . '_mp']['mp_next'] != -1) {
+        $next = cforms2_check_form_name($cformsSettings['form' . $no]['cforms' . $no . '_mp']['mp_next']);
+        $_SESSION['cforms']['current'] = ($next == '') ? 1 : $next;
+    } elseif ($isMPform && $cformsSettings['form' . $no]['cforms' . $no . '_mp']['mp_next'] == -1
+            && isset($_SESSION['cforms'])) {
+        $no = $_SESSION['cforms']['first'];
+        unset($_SESSION['cforms']);
+        $_SESSION['cforms']['current'] = 0;
+        $_SESSION['cforms']['first'] = $no;
+        $_SESSION['cforms']['pos'] = 1;
+    }
+
+    wp_redirect($cf_redirect);
+    exit;
 
 }
 

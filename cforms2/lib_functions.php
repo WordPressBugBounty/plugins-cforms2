@@ -40,8 +40,9 @@ function cforms2_start_session() {
 
 function cforms2_field() {
     check_admin_referer('cforms2_field');
+    cforms2_check_access_priv();
 
-    $type = $_POST['type'];
+    $type = isset($_POST['type']) ? $_POST['type'] : '';
     $fields = cforms2_get_fieldtypes();
     if (array_key_exists($type, $fields))
         echo $fields[$type]->render_settings();
@@ -101,7 +102,7 @@ function cforms2_enqueue_scripts() {
             wp_enqueue_style('cforms2');
         }
 
-        wp_register_script('cforms2', plugin_dir_url(__FILE__) . 'js/cforms.js', array('jquery'), CFORMS2_VERSION);
+        wp_register_script('cforms2', plugin_dir_url(__FILE__) . 'js/cforms.js', array(), CFORMS2_VERSION);
         wp_localize_script('cforms2', 'cforms2_ajax', array(
             'url' => admin_url('admin-ajax.php'),
             'nonces' => array(
